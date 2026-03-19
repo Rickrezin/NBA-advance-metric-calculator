@@ -804,6 +804,7 @@ async function main() {
 
   console.log("2. Fetching box scores...");
   let allPlayers = [];
+  await new Promise(r => setTimeout(r, 2000)); // pause after scores fetch
 
   if (isDryRun) {
     allPlayers = getMockPlayers();
