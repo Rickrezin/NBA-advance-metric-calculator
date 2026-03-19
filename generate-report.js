@@ -23,8 +23,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DRY_RUN = process.argv.includes("--dry-run");
-const isDryRun = DRY_RUN || !process.env.SPORTRADAR_API_KEY;
+const isDryRun = process.argv.includes("--dry-run");
 
 // ─── DATE HELPERS ─────────────────────────────────────────────────
 function getYesterdayET() {
@@ -52,8 +51,8 @@ function isDST(date) {
 // ─── SPORTRADAR NBA API ───────────────────────────────────────────
 async function fetchNBAScores(date) {
   const { year, month, day } = date;
-  const apiKey = process.env.SPORTRADAR_API_KEY;
-  const url = `https://api.sportradar.com/nba/trial/v8/en/league/${year}/${month}/${day}/results.json`;
+  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/results.json?api_key=${apiKey}`;
 
   if (isDryRun) {
     console.log(`[DRY RUN] Would fetch scores for ${year}-${month}-${day}`);
@@ -61,32 +60,24 @@ async function fetchNBAScores(date) {
   }
 
   try {
-    const res = await fetch(url, {
-      headers: { "x-api-key": apiKey, "accept": "application/json" }
-    });
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    data._isMock = false;
-    return data;
+    return await res.json();
   } catch (err) {
     console.error("Failed to fetch scores:", err.message);
-    const data = getMockData(date);
-    data._isMock = true;
-    return data;
+    return getMockData(date);
   }
 }
 
 async function fetchGameBoxScore(gameId) {
-  const apiKey = process.env.SPORTRADAR_API_KEY;
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/boxscore.json`;
+  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/boxscore.json?api_key=${apiKey}`;
 
   if (isDryRun) return null;
 
   try {
     await new Promise(r => setTimeout(r, 1100)); // Rate limit: 1 req/sec
-    const res = await fetch(url, {
-      headers: { "x-api-key": apiKey, "accept": "application/json" }
-    });
+    const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -640,7 +631,7 @@ function parseBoxScore(game, boxscore) {
   return players;
 }
 
-// ─── HTML BUILDER ────────────────────────────────────────────────
+// ─── HTML BUILDERS ────────────────────────────────────────────────
 function buildDashboardHTML(top10, games, dateLabel) {
   const rows = top10.map((p, i) => {
     const offColor = p.offImpact >= 0 ? "#22c55e" : "#ef4444";
@@ -805,7 +796,6 @@ async function main() {
   console.log("1. Fetching last night's scores...");
   const scoresData = await fetchNBAScores(date);
   const games = scoresData?.games || [];
-  const useMockData = isDryRun || scoresData._isMock;
   console.log(`   Found ${games.length} games`);
 
   if (games.length === 0) {
@@ -816,18 +806,18 @@ async function main() {
   console.log("2. Fetching box scores...");
   let allPlayers = [];
 
-  if (useMockData) {
+  if (isDryRun) {
     allPlayers = getMockPlayers();
   } else {
     for (const game of games) {
-      const homeTeam = game.home?.alias || "?";
-      const awayTeam = game.away?.alias || "?";
+      const homeTeam = game.teams?.[game.home]?.abbreviation || game.home;
+      const awayTeam = game.teams?.[game.away]?.abbreviation || game.away;
       console.log(`   Fetching: ${awayTeam} @ ${homeTeam}`);
       const boxscore = await fetchGameBoxScore(game.id);
       if (boxscore) {
         const gameSimple = {
-          home_points: game.home_points || 0,
-          away_points: game.away_points || 0
+          home_points: game.score?.[game.home] || 0,
+          away_points: game.score?.[game.away] || 0
         };
         const players = parseBoxScore(gameSimple, boxscore);
         allPlayers.push(...players);
@@ -836,17 +826,12 @@ async function main() {
   }
   console.log(`   ${allPlayers.length} players parsed`);
 
-  if (allPlayers.length === 0) {
-    console.error("   ❌ No player data available — cannot generate report. Verify API credentials and data availability.");
-    process.exit(1);
-  }
-
   // Build game results for context
   const gameResults = games.map(g => ({
-    home_alias: g.home?.alias || "?",
-    away_alias: g.away?.alias || "?",
-    home_points: g.home_points || 0,
-    away_points: g.away_points || 0,
+    home_alias: g.teams?.[g.home]?.abbreviation || g.home,
+    away_alias: g.teams?.[g.away]?.abbreviation || g.away,
+    home_points: g.score?.[g.home] || 0,
+    away_points: g.score?.[g.away] || 0,
   }));
 
   console.log("3. Computing QPIX™ scores (13 categories)...");
@@ -873,8 +858,8 @@ async function main() {
 
   console.log("4. Building dashboard...");
   const dashboardHTML = buildDashboardHTML(top10, gameResults, date.label);
-  mkdirSync(join(__dirname, "dashboard"), { recursive: true });
-  writeFileSync(join(__dirname, "dashboard/index.html"), dashboardHTML);
+  mkdirSync(join(__dirname, "../dashboard"), { recursive: true });
+  writeFileSync(join(__dirname, "../dashboard/index.html"), dashboardHTML);
   console.log("   dashboard/index.html written");
 
   console.log("\n✅ QPIX™ Report complete!\n");
