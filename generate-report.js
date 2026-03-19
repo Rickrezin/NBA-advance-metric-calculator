@@ -811,14 +811,14 @@ async function main() {
     allPlayers = getMockPlayers();
   } else {
     for (const game of games) {
-      const homeTeam = game.teams?.[game.home]?.abbreviation || game.home;
-      const awayTeam = game.teams?.[game.away]?.abbreviation || game.away;
+      const homeTeam = game.home?.alias || "?";
+      const awayTeam = game.away?.alias || "?";
       console.log(`   Fetching: ${awayTeam} @ ${homeTeam}`);
       const boxscore = await fetchGameBoxScore(game.id);
       if (boxscore) {
         const gameSimple = {
-          home_points: game.score?.[game.home] || 0,
-          away_points: game.score?.[game.away] || 0
+          home_points: game.home_points || 0,
+          away_points: game.away_points || 0
         };
         const players = parseBoxScore(gameSimple, boxscore);
         allPlayers.push(...players);
@@ -834,10 +834,10 @@ async function main() {
 
   // Build game results for context
   const gameResults = games.map(g => ({
-    home_alias: g.teams?.[g.home]?.abbreviation || g.home,
-    away_alias: g.teams?.[g.away]?.abbreviation || g.away,
-    home_points: g.score?.[g.home] || 0,
-    away_points: g.score?.[g.away] || 0,
+    home_alias: g.home?.alias || "?",
+    away_alias: g.away?.alias || "?",
+    home_points: g.home_points || 0,
+    away_points: g.away_points || 0,
   }));
 
   console.log("3. Computing QPIX™ scores (13 categories)...");
