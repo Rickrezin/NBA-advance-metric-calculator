@@ -1,0 +1,51 @@
+################################################################################
+# ⚠️  THIS FILE IS NOT USED BY GITHUB ACTIONS.
+#
+# GitHub Actions only reads workflow files from the .github/workflows/ directory.
+# The active workflow file is located at:
+#
+#   .github/workflows/nba-daily.yml
+#
+# This file at the repo root is ignored. Edit the file above to change the
+# workflow. This file can be safely deleted.
+################################################################################
+
+on:
+  schedule:
+    # Runs at 8:00 AM ET every day (13:00 UTC)
+    - cron: '0 13 * * *'
+  workflow_dispatch: # Allow manual trigger from GitHub UI
+
+jobs:
+  generate-report:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # needed to push dashboard to gh-pages
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+          cache-dependency-path: package.json
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Run NBA report generator
+        env:
+          SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
+        run: node generate-report.js
+
+      - name: Deploy dashboard to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dashboard
+          commit_message: "NBA Report - ${{ env.REPORT_DATE }}"

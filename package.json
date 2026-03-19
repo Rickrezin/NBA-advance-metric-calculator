@@ -1,0 +1,12 @@
+{
+  "name": "nba-daily-report",
+  "version": "1.0.0",
+  "description": "Automated NBA advanced metrics report",
+  "main": "generate-report.js",
+  "type": "module",
+  "scripts": {
+    "start": "node generate-report.js",
+    "test": "node generate-report.js --dry-run"
+  },
+  "dependencies": {}
+}

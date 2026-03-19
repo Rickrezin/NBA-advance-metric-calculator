@@ -1,0 +1,10 @@
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      SYNERGY_API_KEY: ${{ secrets.SYNERGY_API_KEY }}
+      NBA_API_KEY: ${{ secrets.NBA_API_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: python main.py
+      - run: pytest -q
