@@ -669,7 +669,7 @@ function buildDashboardHTML(top10, games, dateLabel) {
               <div style="display:flex;flex-wrap:wrap;gap:8px;">
                 ${[["FG",`${p.fgm}/${p.fga}`],["3P",`${p.fg3m}/${p.fg3a}`],["FT",`${p.ftm}/${p.fta}`],
                    ["TS%",`${p.ts?.toFixed(1)}%`],["+/-",p.plus_minus>=0?`+${p.plus_minus}`:p.plus_minus],
-                   ["2CH",p.second_chance_points],["FBK",p.fast_break_points],["MIN",Math.round(p.minutes)],
+                   ["2CH",p.second_chance_points],["FBK",p.fast_break_points],["MIN",Math.round(p.minutes || 0)],
                    ["QPIX",p.score],["QPIX-R",p.qpixR]
                   ].map(([l,v])=>`<div style="background:#0f172a;border:1px solid #1e293b;border-radius:6px;padding:6px 12px;text-align:center;">
                     <div style="font-size:13px;font-weight:700;color:#e2e8f0;">${v}</div>
