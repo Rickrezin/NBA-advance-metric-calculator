@@ -8,7 +8,5 @@
     "start": "node generate-report.js",
     "test": "node generate-report.js --dry-run"
   },
-  "dependencies": {
-    "node-fetch": "^3.3.2"
-  }
+  "dependencies": {}
 }
