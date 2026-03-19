@@ -632,7 +632,7 @@ function parseBoxScore(game, boxscore) {
   return players;
 }
 
-// ─── HTML BUILDER ──────────────────────────────────────────────────
+// ─── HTML BUILDER ────────────────────────────────────────────────
 function buildDashboardHTML(top10, games, dateLabel) {
   const rows = top10.map((p, i) => {
     const offColor = p.offImpact >= 0 ? "#22c55e" : "#ef4444";
