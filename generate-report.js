@@ -52,8 +52,8 @@ function isDST(date) {
 // ─── SPORTRADAR NBA API ───────────────────────────────────────────
 async function fetchNBAScores(date) {
   const { year, month, day } = date;
-  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/results.json?api_key=${apiKey}`;
+  const apiKey = process.env.SPORTRADAR_API_KEY;
+  const url = `https://api.sportradar.com/nba/trial/v8/en/league/${year}/${month}/${day}/results.json`;
 
   if (isDryRun) {
     console.log(`[DRY RUN] Would fetch scores for ${year}-${month}-${day}`);
@@ -61,24 +61,32 @@ async function fetchNBAScores(date) {
   }
 
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { "x-api-key": apiKey, "accept": "application/json" }
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    data._isMock = false;
+    return data;
   } catch (err) {
     console.error("Failed to fetch scores:", err.message);
-    return getMockData(date);
+    const data = getMockData(date);
+    data._isMock = true;
+    return data;
   }
 }
 
 async function fetchGameBoxScore(gameId) {
-  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/boxscore.json?api_key=${apiKey}`;
+  const apiKey = process.env.SPORTRADAR_API_KEY;
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/boxscore.json`;
 
   if (isDryRun) return null;
 
   try {
     await new Promise(r => setTimeout(r, 1100)); // Rate limit: 1 req/sec
-    const res = await fetch(url);
+    const res = await fetch(url, {
+      headers: { "x-api-key": apiKey, "accept": "application/json" }
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch (err) {
@@ -797,6 +805,7 @@ async function main() {
   console.log("1. Fetching last night's scores...");
   const scoresData = await fetchNBAScores(date);
   const games = scoresData?.games || [];
+  const useMockData = isDryRun || scoresData._isMock;
   console.log(`   Found ${games.length} games`);
 
   if (games.length === 0) {
@@ -807,7 +816,7 @@ async function main() {
   console.log("2. Fetching box scores...");
   let allPlayers = [];
 
-  if (isDryRun) {
+  if (useMockData) {
     allPlayers = getMockPlayers();
   } else {
     for (const game of games) {
