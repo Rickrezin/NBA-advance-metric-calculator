@@ -9,17 +9,21 @@ Fetches every game from the night before, ranks players by Performance Index, an
 
 ## ▶️ Running the Report
 
+> **Which branch?**  
+> Always run the report from the **`main` branch** (your repository's default branch).  
+> GitHub Actions `schedule` and `workflow_dispatch` events are only triggered from the default branch. If the workflow file isn't on `main`, automated runs will not start.
+
 ### Manual run (any time)
 1. Go to your repo on GitHub and click the **Actions** tab
 2. In the left sidebar, click **NBA Daily Report**
-3. Click the **Run workflow** dropdown → **Run workflow**
+3. Click the **Run workflow** dropdown → make sure **Branch: main** is selected → **Run workflow**
 4. The job takes ~2 minutes — then check your inbox and your dashboard
 
 ### Automatic run
 The workflow fires automatically every day at **8:00 AM Eastern** (13:00 UTC). No action needed after setup.
 
 > **Not seeing the "Run workflow" button?**  
-> Make sure the file `.github/workflows/nba-daily.yml` exists in your repository. If you only have `nba-daily.yml` in the root, GitHub Actions won't detect it. See the setup steps below to fix this.
+> Make sure the file `.github/workflows/nba-daily.yml` exists **on the `main` branch** of your repository. If you only have `nba-daily.yml` in the root, or the file is only on another branch, GitHub Actions won't detect it. See the setup steps below to fix this.
 
 ---
 

@@ -1,4 +1,14 @@
-name: NBA Daily Report
+################################################################################
+# ⚠️  THIS FILE IS NOT USED BY GITHUB ACTIONS.
+#
+# GitHub Actions only reads workflow files from the .github/workflows/ directory.
+# The active workflow file is located at:
+#
+#   .github/workflows/nba-daily.yml
+#
+# This file at the repo root is ignored. Edit the file above to change the
+# workflow. This file can be safely deleted.
+################################################################################
 
 on:
   schedule:
