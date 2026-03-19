@@ -858,8 +858,8 @@ async function main() {
 
   console.log("4. Building dashboard...");
   const dashboardHTML = buildDashboardHTML(top10, gameResults, date.label);
-  mkdirSync(join(__dirname, "../dashboard"), { recursive: true });
-  writeFileSync(join(__dirname, "../dashboard/index.html"), dashboardHTML);
+  mkdirSync(join(__dirname, "dashboard"), { recursive: true });
+  writeFileSync(join(__dirname, "dashboard/index.html"), dashboardHTML);
   console.log("   dashboard/index.html written");
 
   console.log("\n✅ QPIX™ Report complete!\n");
