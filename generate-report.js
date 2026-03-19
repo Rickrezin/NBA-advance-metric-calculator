@@ -63,10 +63,14 @@ async function fetchNBAScores(date) {
   try {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    data._isMock = false;
+    return data;
   } catch (err) {
     console.error("Failed to fetch scores:", err.message);
-    return getMockData(date);
+    const data = getMockData(date);
+    data._isMock = true;
+    return data;
   }
 }
 
@@ -797,6 +801,7 @@ async function main() {
   console.log("1. Fetching last night's scores...");
   const scoresData = await fetchNBAScores(date);
   const games = scoresData?.games || [];
+  const useMockData = isDryRun || scoresData._isMock;
   console.log(`   Found ${games.length} games`);
 
   if (games.length === 0) {
@@ -807,7 +812,7 @@ async function main() {
   console.log("2. Fetching box scores...");
   let allPlayers = [];
 
-  if (isDryRun) {
+  if (useMockData) {
     allPlayers = getMockPlayers();
   } else {
     for (const game of games) {
