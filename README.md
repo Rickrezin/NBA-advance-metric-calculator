@@ -65,12 +65,11 @@ The workflow fires automatically every day at **8:00 AM Eastern** (13:00 UTC). N
 
 ### Step 4 — Enable GitHub Pages
 1. In your repo, go to **Settings → Pages**
-2. Under **Source**, select **Deploy from a branch**
-3. Select branch: **gh-pages** → folder: **/ (root)**
-4. Click **Save**
+2. Under **Source**, select **GitHub Actions**
+3. Click **Save**
 
 Your dashboard will be live at:  
-`https://YOUR-USERNAME.github.io/nba-daily-report`
+`https://YOUR-USERNAME.github.io/NBA-daily-report`
 
 ### Step 5 — Test it manually
 1. Go to **Actions** tab in your repo
