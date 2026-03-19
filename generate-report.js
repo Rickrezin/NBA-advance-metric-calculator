@@ -767,11 +767,22 @@ function toggleRow(i) {
 }
 
 // ─── MOCK DATA ─────────────────────────────────────────────────────
+// Mirrors the real Sportradar API v8 shape: games[].home / .away are team
+// ID keys (UUIDs in production; simplified lowercase here), .teams maps
+// each ID to team metadata, and .score maps each ID to points.
 function getMockData() {
   return {
     games: [
-      { id: "mock-1", home: { alias: "NYK" }, away: { alias: "BOS" }, home_points: 112, away_points: 108 },
-      { id: "mock-2", home: { alias: "LAL" }, away: { alias: "GSW" }, home_points: 121, away_points: 119 },
+      {
+        id: "mock-1", home: "nyk", away: "bos",
+        teams: { nyk: { abbreviation: "NYK" }, bos: { abbreviation: "BOS" } },
+        score: { nyk: 112, bos: 108 }
+      },
+      {
+        id: "mock-2", home: "lal", away: "gsw",
+        teams: { lal: { abbreviation: "LAL" }, gsw: { abbreviation: "GSW" } },
+        score: { lal: 121, gsw: 119 }
+      },
     ]
   };
 }
