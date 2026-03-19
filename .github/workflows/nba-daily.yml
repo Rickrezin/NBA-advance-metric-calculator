@@ -2,17 +2,14 @@ name: NBA Daily Report
 
 on:
   schedule:
-    # Runs at 8:00 AM ET every day (13:00 UTC)
     - cron: '0 13 * * *'
-  workflow_dispatch: # Allow manual trigger — always runs from the default branch (main)
+  workflow_dispatch:
 
 jobs:
   generate-report:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # needed to push dashboard to gh-pages
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -22,16 +19,11 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          cache: 'npm'
-          cache-dependency-path: package.json
-
-      - name: Install dependencies
-        run: npm install
 
       - name: Run NBA report generator
         env:
           SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
-        run: node generate-report.js
+        run: node src/generate-report.js
 
       - name: Deploy dashboard to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
