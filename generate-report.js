@@ -577,11 +577,15 @@ function buildGameContext(player, allGamePlayers, gameResult) {
 // ─── PARSE SPORTRADAR BOXSCORE ────────────────────────────────────
 function parseBoxScore(game, boxscore) {
   const players = [];
-  if (!boxscore?.home?.players && !boxscore?.away?.players) return players;
+  console.log('BOXSCORE TOP KEYS:', Object.keys(boxscore || {}));
+  if (boxscore?.home) console.log('HOME KEYS:', Object.keys(boxscore.home));
+  if (!boxscore?.home?.players && !boxscore?.away?.players
+      && !boxscore?.home?.player_stats && !boxscore?.away?.player_stats) return players;
 
   const processTeam = (teamData, teamAbbr, isHome) => {
-    if (!teamData?.players) return;
-    for (const player of teamData.players) {
+    const playerList = teamData?.players || teamData?.player_stats;
+    if (!playerList) return;
+    for (const player of playerList) {
       if (!player.statistics) continue;
       const s = player.statistics;
       if ((s.minutes || 0) < 5) continue;
