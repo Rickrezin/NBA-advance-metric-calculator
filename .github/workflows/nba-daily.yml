@@ -25,6 +25,9 @@ jobs:
           SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
         run: node generate-report.js
 
+      - name: Ensure dashboard directory exists
+        run: mkdir -p dashboard
+
       - name: Deploy dashboard to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
