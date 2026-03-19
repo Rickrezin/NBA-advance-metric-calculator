@@ -806,6 +806,7 @@ async function main() {
 
   console.log("1. Fetching last night's scores...");
   const scoresData = await fetchNBAScores(date);
+  console.log(JSON.stringify(scoresData?.games?.[0], null, 2));
   const games = scoresData?.games || [];
   console.log(`   Found ${games.length} games`);
 
