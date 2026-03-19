@@ -114,7 +114,7 @@ function computeC1(p) {
 // TS% delta vs 55% baseline × 0.3, foul drawing bonus, inefficiency penalty
 function computeC2(p) {
   const ts = computeTS(p);
-  let score = (ts - 55) * 0.3;
+  let score = (ts - 55) * 0.4;
   if (p.fta >= 8) score += 3;
   else if (p.fta >= 5) score += 1.5;
   if (ts < 38 && p.fga > 5) score -= 4;
@@ -124,8 +124,8 @@ function computeC2(p) {
 // C3 — PROPRIETARY OFF/DEF ± SPLIT
 // Both sides measured against 110 baseline, weighted equally — the QPIX™ moat
 function computeC3(p) {
-  const offImpact = (p.offensive_rating - 110) / 10;
-  const defImpact = (110 - p.defensive_rating) / 10;
+  const offImpact = Math.min(4.0, Math.max(-4.0, (p.offensive_rating - 110) / 10));
+  const defImpact = Math.min(4.0, Math.max(-4.0, (110 - p.defensive_rating) / 10));
   return {
     score: offImpact * 2 + defImpact * 2,
     offImpact: Math.round(offImpact * 10) / 10,
@@ -858,8 +858,8 @@ async function main() {
 
   console.log("4. Building dashboard...");
   const dashboardHTML = buildDashboardHTML(top10, gameResults, date.label);
-  mkdirSync(join(__dirname, "dashboard"), { recursive: true });
-  writeFileSync(join(__dirname, "dashboard/index.html"), dashboardHTML);
+  mkdirSync(join(__dirname, "../dashboard"), { recursive: true });
+  writeFileSync(join(__dirname, "../dashboard/index.html"), dashboardHTML);
   console.log("   dashboard/index.html written");
 
   console.log("\n✅ QPIX™ Report complete!\n");
