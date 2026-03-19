@@ -988,8 +988,8 @@ async function main() {
 
   console.log("5. Building dashboard...");
   const dashboardHTML = buildDashboardHTML(top10, gameResults, aiAnalysis, date.label);
-  mkdirSync(join(__dirname, "../dashboard"), { recursive: true });
-  writeFileSync(join(__dirname, "../dashboard/index.html"), dashboardHTML);
+  mkdirSync(join(__dirname, "dashboard"), { recursive: true });
+  writeFileSync(join(__dirname, "dashboard/index.html"), dashboardHTML);
   console.log("   dashboard/index.html written");
 
   if (!isDryRun && process.env.SENDGRID_API_KEY) {
