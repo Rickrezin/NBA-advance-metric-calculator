@@ -18,7 +18,6 @@
  * 13.  QPIX-R (Referee Normalization Layer)
  */
 
-import sgMail from "@sendgrid/mail";
 import { writeFileSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
@@ -633,129 +632,8 @@ function parseBoxScore(game, boxscore) {
   return players;
 }
 
-// ─── AI ANALYSIS ──────────────────────────────────────────────────
-async function getAIAnalysis(top10, dateLabel) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return "AI analysis unavailable — add ANTHROPIC_API_KEY to GitHub secrets to enable.";
-  }
-
-  const { default: Anthropic } = await import("@anthropic-ai/sdk");
-  const client = new Anthropic();
-  const playerSummary = top10.slice(0, 5).map((p, i) =>
-    `${i + 1}. ${p.name} (${p.team}): ${p.points}pts/${p.rebounds}reb/${p.assists}ast, TS%: ${p.ts?.toFixed(1)}, Off±: ${p.offImpact >= 0 ? "+" : ""}${p.offImpact}, Def±: ${p.defImpact >= 0 ? "+" : ""}${p.defImpact}, QPIX: ${p.score}, QPIX-R: ${p.qpixR}`
-  ).join("\n");
-
-  const msg = await client.messages.create({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 500,
-    messages: [{
-      role: "user",
-      content: `You are an elite NBA analyst writing a sharp morning briefing for ${dateLabel}. Based on last night's QPIX™ top performers, give a crisp 4-5 sentence analysis. Focus on: the best two-way performer, any standout efficiency story, a player who impacted winning that the box score undersells, and one bold take. Note any significant QPIX-R referee adjustments. Be specific and direct.\n\nTop 5 QPIX™ performers:\n${playerSummary}`
-    }]
-  });
-
-  return msg.content[0].text;
-}
-
-// ─── HTML BUILDERS ────────────────────────────────────────────────
-function buildEmailHTML(top10, games, aiAnalysis, dateLabel) {
-  const playerRow = (p, rank) => {
-    const medal = rank <= 3 ? ["🥇","🥈","🥉"][rank-1] : `#${rank}`;
-    const offColor = p.offImpact >= 0 ? "#22c55e" : "#ef4444";
-    const defColor = p.defImpact >= 0 ? "#3b82f6" : "#ef4444";
-    const qpixRDiff = p.qpixR - p.score;
-    const qpixRColor = qpixRDiff >= 0 ? "#22c55e" : "#ef4444";
-    const qpixRLabel = qpixRDiff >= 0 ? `+${qpixRDiff.toFixed(1)}` : qpixRDiff.toFixed(1);
-    return `
-    <tr style="border-bottom:1px solid #1e293b;">
-      <td style="padding:12px 8px;color:#94a3b8;font-size:15px;text-align:center;">${medal}</td>
-      <td style="padding:12px 8px;">
-        <div style="font-weight:800;color:#f1f5f9;font-size:14px;">${p.name}</div>
-        <div style="font-size:11px;color:#475569;">${p.team} · ${p.game}</div>
-      </td>
-      <td style="padding:12px 8px;text-align:center;font-weight:900;color:#f97316;font-size:16px;">${p.points}</td>
-      <td style="padding:12px 8px;text-align:center;color:#e2e8f0;">${p.rebounds}</td>
-      <td style="padding:12px 8px;text-align:center;color:#e2e8f0;">${p.assists}</td>
-      <td style="padding:12px 8px;text-align:center;color:#e2e8f0;">${p.steals}/${p.blocks}</td>
-      <td style="padding:12px 8px;text-align:center;font-size:12px;">
-        <span style="color:${offColor};">O:${p.offImpact>=0?"+":""}${p.offImpact}</span>
-        <span style="color:#475569;"> / </span>
-        <span style="color:${defColor};">D:${p.defImpact>=0?"+":""}${p.defImpact}</span>
-      </td>
-      <td style="padding:12px 8px;text-align:center;font-size:12px;color:#94a3b8;">${p.ts?.toFixed(1)}%</td>
-      <td style="padding:12px 8px;text-align:center;">
-        <span style="background:#f97316;color:#fff;font-weight:900;font-size:13px;padding:3px 8px;border-radius:6px;">${p.score}</span>
-        <div style="font-size:10px;color:${qpixRColor};margin-top:2px;">R:${p.qpixR} (${qpixRLabel})</div>
-      </td>
-    </tr>`;
-  };
-
-  const scoreboardItems = games.map(g =>
-    `<div style="background:#0f1f35;border-radius:8px;padding:10px 14px;display:inline-block;margin:4px;">
-      <div style="font-size:11px;color:#22c55e;font-weight:700;margin-bottom:4px;">FINAL</div>
-      <div style="font-size:13px;font-weight:800;color:${g.away_points>g.home_points?"#f97316":"#64748b"};">${g.away_alias} ${g.away_points}</div>
-      <div style="font-size:13px;font-weight:800;color:${g.home_points>g.away_points?"#f97316":"#64748b"};">${g.home_alias} ${g.home_points}</div>
-    </div>`
-  ).join("");
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>QPIX™ Daily Report - ${dateLabel}</title></head>
-<body style="margin:0;padding:0;background:#060e1a;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-<div style="max-width:720px;margin:0 auto;padding:24px 16px;">
-  <div style="text-align:center;padding:32px 0 24px;">
-    <div style="font-size:11px;color:#22c55e;font-weight:700;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px;">🏀 QCore Labs</div>
-    <h1 style="margin:0;font-size:28px;font-weight:900;color:#f8fafc;letter-spacing:-1px;">QPIX™ Daily Report</h1>
-    <div style="font-size:14px;color:#475569;margin-top:6px;">${dateLabel}</div>
-    <div style="font-size:11px;color:#1e3a5f;margin-top:4px;">13-Category Performance Index · QCoreLabs.com</div>
-  </div>
-  <div style="background:#0c1520;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:20px;text-align:center;">
-    <div style="font-size:11px;color:#475569;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Last Night's Results</div>
-    ${scoreboardItems}
-  </div>
-  <div style="background:linear-gradient(135deg,#0c1a2e,#0f1f35);border:1px solid #1d4ed8;border-radius:12px;padding:20px;margin-bottom:20px;">
-    <div style="font-size:11px;color:#3b82f6;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🤖 AI Analyst</div>
-    <p style="margin:0;color:#94a3b8;font-size:14px;line-height:1.8;font-style:italic;">"${aiAnalysis}"</p>
-  </div>
-  <div style="background:#0c1520;border:1px solid #1e293b;border-radius:12px;overflow:hidden;margin-bottom:20px;">
-    <div style="padding:16px 20px;border-bottom:1px solid #1e293b;">
-      <div style="font-size:13px;font-weight:800;color:#f97316;text-transform:uppercase;letter-spacing:1px;">QPIX™ Top 10</div>
-      <div style="font-size:11px;color:#475569;margin-top:3px;">QPIX = raw score · QPIX-R = referee-adjusted</div>
-    </div>
-    <table style="width:100%;border-collapse:collapse;">
-      <thead><tr style="background:#0f1f35;">
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;"></th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:left;font-weight:700;text-transform:uppercase;">Player</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">PTS</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">REB</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">AST</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">STL/BLK</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">O/D ±</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">TS%</th>
-        <th style="padding:8px;font-size:10px;color:#475569;text-align:center;font-weight:700;text-transform:uppercase;">QPIX</th>
-      </tr></thead>
-      <tbody style="background:#0c1520;">${top10.map((p,i) => playerRow(p, i+1)).join("")}</tbody>
-    </table>
-  </div>
-  <div style="background:#0c1520;border:1px solid #1e293b;border-radius:12px;padding:16px;margin-bottom:20px;">
-    <div style="font-size:11px;color:#f97316;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;">Why They Ranked Here</div>
-    ${top10.slice(0,5).map((p,i) => `
-      <div style="margin-bottom:12px;">
-        <div style="font-size:13px;font-weight:800;color:#f1f5f9;">#${i+1} ${p.name} — ${p.score} QPIX | ${p.qpixR} QPIX-R</div>
-        <div style="font-size:12px;color:#64748b;margin-top:3px;">${p.notes.join(" · ")}</div>
-      </div>`).join("")}
-  </div>
-  <div style="text-align:center;padding:16px;color:#1e3a5f;font-size:11px;line-height:1.7;">
-    QPIX™ 13 Categories: Base Production · Shooting Efficiency · Off/Def ± Split · Defensive Activity · Playmaking Quality · Offensive Context · Gravity Score · Context-Weighted +/− · Multi-Category Bonuses · Fatigue Curve · Momentum Swing · Second Unit Anchor · QPIX-R Referee Layer<br>
-    Generated automatically via GitHub Actions · QCore Labs © 2026 · QCoreLabs.com
-  </div>
-</div>
-</body>
-</html>`;
-}
-
-function buildDashboardHTML(top10, games, aiAnalysis, dateLabel) {
+// ─── HTML BUILDER ──────────────────────────────────────────────────
+function buildDashboardHTML(top10, games, dateLabel) {
   const rows = top10.map((p, i) => {
     const offColor = p.offImpact >= 0 ? "#22c55e" : "#ef4444";
     const defColor = p.defImpact >= 0 ? "#3b82f6" : "#ef4444";
@@ -853,10 +731,6 @@ function buildDashboardHTML(top10, games, aiAnalysis, dateLabel) {
   <div class="card">
     <div class="card-header"><div style="font-size:12px;font-weight:700;color:#f97316;text-transform:uppercase;letter-spacing:1px;">Last Night's Results</div></div>
     <div style="padding:16px;"><div class="scores">${scoreboard}</div></div>
-  </div>
-  <div style="background:linear-gradient(135deg,#0c1a2e,#0f1f35);border:1px solid #1d4ed8;border-radius:12px;padding:20px;margin-bottom:20px;">
-    <div style="font-size:11px;color:#3b82f6;font-weight:700;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">🤖 AI Analyst — Claude</div>
-    <p style="margin:0;color:#94a3b8;font-size:14px;line-height:1.8;font-style:italic;">"${aiAnalysis}"</p>
   </div>
   <div class="card">
     <div class="card-header">
@@ -988,29 +862,11 @@ async function main() {
   const top10 = scoredPlayers.slice(0, 10);
   console.log(`   Top: ${top10[0]?.name} | QPIX: ${top10[0]?.score} | QPIX-R: ${top10[0]?.qpixR}`);
 
-  console.log("4. Getting AI analysis...");
-  const aiAnalysis = await getAIAnalysis(top10, date.label);
-
-  console.log("5. Building dashboard...");
-  const dashboardHTML = buildDashboardHTML(top10, gameResults, aiAnalysis, date.label);
+  console.log("4. Building dashboard...");
+  const dashboardHTML = buildDashboardHTML(top10, gameResults, date.label);
   mkdirSync(join(__dirname, "dashboard"), { recursive: true });
   writeFileSync(join(__dirname, "dashboard/index.html"), dashboardHTML);
   console.log("   dashboard/index.html written");
-
-  if (!isDryRun && process.env.SENDGRID_API_KEY) {
-    console.log("6. Sending email...");
-    sgMail.setApiKey(process.env.SENDGRID_API_KEY);
-    const emailHTML = buildEmailHTML(top10, gameResults, aiAnalysis, date.label);
-    await sgMail.send({
-      to: process.env.REPORT_EMAIL_TO,
-      from: process.env.REPORT_EMAIL_FROM,
-      subject: `QPIX™ | ${date.label} | Top: ${top10[0]?.name} (${top10[0]?.points}pts · ${top10[0]?.score} QPIX)`,
-      html: emailHTML,
-    });
-    console.log(`   Email sent to ${process.env.REPORT_EMAIL_TO}`);
-  } else {
-    console.log(`6. Skipping email (${!process.env.SENDGRID_API_KEY ? "no SendGrid key configured" : "using mock data"})`);
-  }
 
   console.log("\n✅ QPIX™ Report complete!\n");
 }
