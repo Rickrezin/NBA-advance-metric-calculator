@@ -71,7 +71,7 @@ async function fetchNBAScores(date) {
 
 async function fetchGameBoxScore(gameId) {
   const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/boxscore.json?api_key=${apiKey}`;
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/summary.json?api_key=${apiKey}`;
 
   if (isDryRun) return null;
 
@@ -577,15 +577,11 @@ function buildGameContext(player, allGamePlayers, gameResult) {
 // ─── PARSE SPORTRADAR BOXSCORE ────────────────────────────────────
 function parseBoxScore(game, boxscore) {
   const players = [];
-  console.log('BOXSCORE TOP KEYS:', Object.keys(boxscore || {}));
-  if (boxscore?.home) console.log('HOME KEYS:', Object.keys(boxscore.home));
-  if (!boxscore?.home?.players && !boxscore?.away?.players
-      && !boxscore?.home?.player_stats && !boxscore?.away?.player_stats) return players;
+  if (!boxscore?.home?.players && !boxscore?.away?.players) return players;
 
   const processTeam = (teamData, teamAbbr, isHome) => {
-    const playerList = teamData?.players || teamData?.player_stats;
-    if (!playerList) return;
-    for (const player of playerList) {
+    if (!teamData?.players) return;
+    for (const player of teamData.players) {
       if (!player.statistics) continue;
       const s = player.statistics;
       if ((s.minutes || 0) < 5) continue;
