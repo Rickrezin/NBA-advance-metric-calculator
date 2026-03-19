@@ -52,7 +52,7 @@ function isDST(date) {
 async function fetchNBAScores(date) {
   const { year, month, day } = date;
   const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/results.json?api_key=${apiKey}`;
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/schedule.json?api_key=${apiKey}`;
 
   if (isDryRun) {
     console.log(`[DRY RUN] Would fetch scores for ${year}-${month}-${day}`);
