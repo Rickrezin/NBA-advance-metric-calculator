@@ -30,10 +30,7 @@ jobs:
 
       - name: Run NBA report generator
         env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
-          REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
+          SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
         run: node generate-report.js
 
       - name: Deploy dashboard to GitHub Pages

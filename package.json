@@ -9,8 +9,6 @@
     "test": "node generate-report.js --dry-run"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.20.0",
-    "@sendgrid/mail": "^8.1.0",
     "node-fetch": "^3.3.2"
   }
 }
