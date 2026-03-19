@@ -25,7 +25,7 @@ import { fileURLToPath } from "url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DRY_RUN = process.argv.includes("--dry-run");
-const isDryRun = DRY_RUN || !process.env.SENDGRID_API_KEY;
+const isDryRun = DRY_RUN || !process.env.SPORTRADAR_API_KEY;
 
 // ─── DATE HELPERS ─────────────────────────────────────────────────
 function getYesterdayET() {
@@ -953,6 +953,11 @@ async function main() {
   }
   console.log(`   ${allPlayers.length} players parsed`);
 
+  if (allPlayers.length === 0) {
+    console.error("   ❌ No player data available — cannot generate report. Verify API credentials and data availability.");
+    process.exit(1);
+  }
+
   // Build game results for context
   const gameResults = games.map(g => ({
     home_alias: g.teams?.[g.home]?.abbreviation || g.home,
@@ -1004,7 +1009,7 @@ async function main() {
     });
     console.log(`   Email sent to ${process.env.REPORT_EMAIL_TO}`);
   } else {
-    console.log("6. Skipping email (dry run or no SendGrid key)");
+    console.log(`6. Skipping email (${!process.env.SENDGRID_API_KEY ? "no SendGrid key configured" : "using mock data"})`);
   }
 
   console.log("\n✅ QPIX™ Report complete!\n");
