@@ -23,7 +23,7 @@ jobs:
       - name: Run NBA report generator
         env:
           SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
-        run: node src/generate-report.js
+        run: node generate-report.js
 
       - name: Deploy dashboard to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
