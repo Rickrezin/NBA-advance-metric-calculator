@@ -52,7 +52,7 @@ function isDST(date) {
 async function fetchNBAScores(date) {
   const { year, month, day } = date;
   const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/schedule.json?api_key=${apiKey}`;
+  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/results.json?api_key=${apiKey}`;
 
   if (isDryRun) {
     console.log(`[DRY RUN] Would fetch scores for ${year}-${month}-${day}`);
@@ -76,7 +76,6 @@ async function fetchGameBoxScore(gameId) {
   if (isDryRun) return null;
 
   try {
-    await new Promise(r => setTimeout(r, 1100)); // Rate limit: 1 req/sec
     const res = await fetch(url);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
@@ -767,22 +766,11 @@ function toggleRow(i) {
 }
 
 // ─── MOCK DATA ─────────────────────────────────────────────────────
-// Mirrors the real Sportradar API v8 shape: games[].home / .away are team
-// ID keys (UUIDs in production; simplified lowercase here), .teams maps
-// each ID to team metadata, and .score maps each ID to points.
 function getMockData() {
   return {
     games: [
-      {
-        id: "mock-1", home: "nyk", away: "bos",
-        teams: { nyk: { abbreviation: "NYK" }, bos: { abbreviation: "BOS" } },
-        score: { nyk: 112, bos: 108 }
-      },
-      {
-        id: "mock-2", home: "lal", away: "gsw",
-        teams: { lal: { abbreviation: "LAL" }, gsw: { abbreviation: "GSW" } },
-        score: { lal: 121, gsw: 119 }
-      },
+      { id: "mock-1", home: { alias: "NYK" }, away: { alias: "BOS" }, home_points: 112, away_points: 108 },
+      { id: "mock-2", home: { alias: "LAL" }, away: { alias: "GSW" }, home_points: 121, away_points: 119 },
     ]
   };
 }
@@ -806,7 +794,6 @@ async function main() {
 
   console.log("1. Fetching last night's scores...");
   const scoresData = await fetchNBAScores(date);
-  console.log(JSON.stringify(scoresData?.games?.[0], null, 2));
   const games = scoresData?.games || [];
   console.log(`   Found ${games.length} games`);
 
@@ -822,14 +809,15 @@ async function main() {
     allPlayers = getMockPlayers();
   } else {
     for (const game of games) {
-      const homeTeam = game.teams?.[game.home]?.abbreviation || game.home;
-      const awayTeam = game.teams?.[game.away]?.abbreviation || game.away;
+      const homeTeam = game.home?.alias || game.home;
+      const awayTeam = game.away?.alias || game.away;
       console.log(`   Fetching: ${awayTeam} @ ${homeTeam}`);
+      await new Promise(r => setTimeout(r, 1200)); // 1.2s between requests
       const boxscore = await fetchGameBoxScore(game.id);
       if (boxscore) {
         const gameSimple = {
-          home_points: game.score?.[game.home] || 0,
-          away_points: game.score?.[game.away] || 0
+          home_points: game.home_points || 0,
+          away_points: game.away_points || 0
         };
         const players = parseBoxScore(gameSimple, boxscore);
         allPlayers.push(...players);
@@ -840,10 +828,10 @@ async function main() {
 
   // Build game results for context
   const gameResults = games.map(g => ({
-    home_alias: g.teams?.[g.home]?.abbreviation || g.home,
-    away_alias: g.teams?.[g.away]?.abbreviation || g.away,
-    home_points: g.score?.[g.home] || 0,
-    away_points: g.score?.[g.away] || 0,
+    home_alias: g.home?.alias || g.home,
+    away_alias: g.away?.alias || g.away,
+    home_points: g.home_points || 0,
+    away_points: g.away_points || 0,
   }));
 
   console.log("3. Computing QPIX™ scores (13 categories)...");
