@@ -25,6 +25,20 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Create data directory
+        run: mkdir -p data
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Fetch NBA data
+        run: python scripts/fetch_nba_data.py
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,8 +50,6 @@ jobs:
           cp index.html dashboard/index.html
 
       - name: Run NBA report generator
-        env:
-          SPORTRADAR_API_KEY: ${{ secrets.SPORTRADAR_API_KEY }}
         run: node generate-report.js
 
       - name: Setup Pages
