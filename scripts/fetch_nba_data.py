@@ -51,14 +51,16 @@ RETRY_DELAY = 5  # seconds
 
 def retry(fn, *args, retries=MAX_RETRIES, delay=RETRY_DELAY, **kwargs):
     """Call fn(*args, **kwargs), retrying up to `retries` times on exception."""
+    last_exc = None
     for attempt in range(1, retries + 1):
         try:
             return fn(*args, **kwargs)
         except Exception as e:
+            last_exc = e
             print(f"  Attempt {attempt}/{retries} failed: {e}")
             if attempt < retries:
                 time.sleep(delay)
-    raise RuntimeError(f"All {retries} retries exhausted for {fn.__name__}")
+    raise RuntimeError(f"All {retries} retries exhausted for {fn.__name__}") from last_exc
 
 
 def get_yesterday_et():
