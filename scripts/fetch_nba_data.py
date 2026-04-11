@@ -20,6 +20,8 @@ import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import requests.exceptions
+
 from nba_api.stats.endpoints import (
     scoreboardv2,
     boxscoretraditionalv2,
@@ -29,15 +31,20 @@ from nba_api.stats.endpoints import (
 _API_TIMEOUT = 60
 _MAX_RETRIES = 3
 _RETRY_BACKOFF = 5  # seconds; doubles on each retry
+_RETRYABLE = (
+    requests.exceptions.Timeout,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+)
 
 
 def _retry(fn, *args, **kwargs):
-    """Call fn(*args, **kwargs), retrying up to _MAX_RETRIES times on failure."""
+    """Call fn(*args, **kwargs), retrying on network errors up to _MAX_RETRIES times."""
     delay = _RETRY_BACKOFF
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
             return fn(*args, **kwargs)
-        except Exception as exc:
+        except _RETRYABLE as exc:
             if attempt == _MAX_RETRIES:
                 raise
             print(f"  Attempt {attempt} failed ({exc}). Retrying in {delay}s…")
