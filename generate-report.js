@@ -18,7 +18,7 @@
  * 13.  QPIX-R (Referee Normalization Layer)
  */
 
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
@@ -48,41 +48,11 @@ function isDST(date) {
   return Math.min(jan, jul) === date.getTimezoneOffset();
 }
 
-// ─── SPORTRADAR NBA API ───────────────────────────────────────────
-async function fetchNBAScores(date) {
-  const { year, month, day } = date;
-  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${year}/${month}/${day}/schedule.json?api_key=${apiKey}`;
-
-  if (isDryRun) {
-    console.log(`[DRY RUN] Would fetch scores for ${year}-${month}-${day}`);
-    return getMockData(date);
-  }
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error("Failed to fetch scores:", err.message);
-    return getMockData(date);
-  }
-}
-
-async function fetchGameBoxScore(gameId) {
-  const apiKey = process.env.SPORTRADAR_API_KEY || "YOUR_SPORTRADAR_TRIAL_KEY";
-  const url = `https://api.sportradar.com/nba/trial/v8/en/games/${gameId}/summary.json?api_key=${apiKey}`;
-
-  if (isDryRun) return null;
-
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
-  } catch (err) {
-    console.error(`Failed to fetch boxscore ${gameId}:`, err.message);
-    return null;
-  }
+// ─── LOAD NBA DATA ────────────────────────────────────────────────
+function loadNBAData() {
+  const dataPath = join(__dirname, "data", "nba_data.json");
+  const raw = readFileSync(dataPath, "utf-8");
+  return JSON.parse(raw);
 }
 
 // ─── TS% HELPER ───────────────────────────────────────────────────
@@ -574,62 +544,6 @@ function buildGameContext(player, allGamePlayers, gameResult) {
   };
 }
 
-// ─── PARSE SPORTRADAR BOXSCORE ────────────────────────────────────
-function parseBoxScore(game, boxscore) {
-  const players = [];
-  if (!boxscore?.home?.players && !boxscore?.away?.players) return players;
-
-  const processTeam = (teamData, teamAbbr, isHome) => {
-    if (!teamData?.players) return;
-    for (const player of teamData.players) {
-      if (!player.statistics) continue;
-      const s = player.statistics;
-      if ((s.minutes || 0) < 5) continue;
-
-      players.push({
-        name: player.full_name,
-        team: teamAbbr,
-        position: player.primary_position || "G",
-        minutes: s.minutes || 0,
-        points: s.points || 0,
-        rebounds: s.rebounds || 0,
-        offensive_rebounds: s.offensive_rebounds || 0,
-        defensive_rebounds: s.defensive_rebounds || 0,
-        assists: s.assists || 0,
-        steals: s.steals || 0,
-        blocks: s.blocks || 0,
-        turnovers: s.turnovers || 0,
-        fouls: s.personal_fouls || 0,
-        fgm: s.field_goals_made || 0,
-        fga: s.field_goals_att || 0,
-        fg3m: s.three_points_made || 0,
-        fg3a: s.three_points_att || 0,
-        ftm: s.free_throws_made || 0,
-        fta: s.free_throws_att || 0,
-        ft_pct: s.free_throws_att > 0
-          ? (s.free_throws_made || 0) / s.free_throws_att
-          : 0.75,
-        plus_minus: s.pls_min || 0,
-        offensive_rating: s.offensive_rating || 110,
-        defensive_rating: s.defensive_rating || 110,
-        second_chance_points: s.second_chance_pts || 0,
-        fast_break_points: s.fast_break_pts || 0,
-        points_in_paint: s.points_in_paint || 0,
-        game: `${boxscore.away?.alias || "?"} @ ${boxscore.home?.alias || "?"}`,
-        home_alias: boxscore.home?.alias,
-        away_alias: boxscore.away?.alias,
-        home_points: isHome ? game.home_points : game.away_points,
-        away_points: isHome ? game.away_points : game.home_points,
-        is_home: isHome
-      });
-    }
-  };
-
-  processTeam(boxscore.home, boxscore.home?.alias, true);
-  processTeam(boxscore.away, boxscore.away?.alias, false);
-  return players;
-}
-
 // ─── HTML BUILDERS ────────────────────────────────────────────────
 function buildDashboardHTML(top10, games, dateLabel) {
   const rows = top10.map((p, i) => {
@@ -765,23 +679,6 @@ function toggleRow(i) {
 </html>`;
 }
 
-// ─── MOCK DATA ─────────────────────────────────────────────────────
-function getMockData() {
-  return {
-    games: [
-      { id: "mock-1", home: { alias: "NYK" }, away: { alias: "BOS" }, home_points: 112, away_points: 108 },
-      { id: "mock-2", home: { alias: "LAL" }, away: { alias: "GSW" }, home_points: 121, away_points: 119 },
-    ]
-  };
-}
-
-function getMockPlayers() {
-  return [
-    { name: "Jalen Brunson", team: "NYK", position: "G", minutes: 36, points: 34, rebounds: 4, assists: 9, steals: 2, blocks: 0, turnovers: 2, fgm: 12, fga: 22, fg3m: 3, fg3a: 8, ftm: 7, fta: 8, ft_pct: 0.875, offensive_rebounds: 0, defensive_rebounds: 4, plus_minus: 11, offensive_rating: 124, defensive_rating: 106, second_chance_points: 2, fast_break_points: 4, points_in_paint: 10, game: "BOS @ NYK", home_alias: "NYK", away_alias: "BOS", home_points: 112, away_points: 108, is_home: true },
-    { name: "Luka Doncic", team: "LAL", position: "G", minutes: 38, points: 38, rebounds: 9, assists: 12, steals: 1, blocks: 1, turnovers: 4, fgm: 13, fga: 25, fg3m: 4, fg3a: 10, ftm: 8, fta: 10, ft_pct: 0.80, offensive_rebounds: 1, defensive_rebounds: 8, plus_minus: 6, offensive_rating: 128, defensive_rating: 110, second_chance_points: 2, fast_break_points: 6, points_in_paint: 12, game: "GSW @ LAL", home_alias: "LAL", away_alias: "GSW", home_points: 121, away_points: 119, is_home: true },
-  ];
-}
-
 // ─── MAIN ──────────────────────────────────────────────────────────
 async function main() {
   const date = getYesterdayET();
@@ -792,47 +689,21 @@ async function main() {
     writeFileSync(process.env.GITHUB_ENV, `REPORT_DATE=${date.month}/${date.day}/${date.year}\n`, { flag: "a" });
   }
 
-  console.log("1. Fetching last night's scores...");
-  const scoresData = await fetchNBAScores(date);
-  const games = scoresData?.games || [];
-  console.log(`   Found ${games.length} games`);
+  console.log("1. Loading NBA data...");
+  const { games, players: allPlayers } = loadNBAData();
+  console.log(`   Found ${games.length} games, ${allPlayers.length} players`);
 
   if (games.length === 0) {
-    console.log("   No games last night. Exiting.");
+    console.log("   No games found. Exiting.");
     process.exit(0);
   }
 
-  console.log("2. Fetching box scores...");
-  let allPlayers = [];
-  await new Promise(r => setTimeout(r, 2000)); // pause after scores fetch
-
-  if (isDryRun) {
-    allPlayers = getMockPlayers();
-  } else {
-    for (const game of games) {
-      const homeTeam = game.home?.alias || game.home;
-      const awayTeam = game.away?.alias || game.away;
-      console.log(`   Fetching: ${awayTeam} @ ${homeTeam}`);
-      await new Promise(r => setTimeout(r, 1200)); // 1.2s between requests
-      const boxscore = await fetchGameBoxScore(game.id);
-      if (boxscore) {
-        const gameSimple = {
-          home_points: game.home_points || 0,
-          away_points: game.away_points || 0
-        };
-        const players = parseBoxScore(gameSimple, boxscore);
-        allPlayers.push(...players);
-      }
-    }
-  }
-  console.log(`   ${allPlayers.length} players parsed`);
-
   // Build game results for context
   const gameResults = games.map(g => ({
-    home_alias: g.home?.alias || g.home,
-    away_alias: g.away?.alias || g.away,
-    home_points: g.home_points || 0,
-    away_points: g.away_points || 0,
+    home_alias: g.home_alias,
+    away_alias: g.away_alias,
+    home_points: g.home_points,
+    away_points: g.away_points,
   }));
 
   console.log("3. Computing QPIX™ scores (13 categories)...");
