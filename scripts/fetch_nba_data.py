@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 import requests.exceptions
 
 from nba_api.stats.endpoints import (
-    scoreboardv2,
+    scoreboardv3,
     boxscoretraditionalv2,
     boxscoreadvancedv2,
 )
@@ -53,15 +53,15 @@ def _retry(fn, *args, **kwargs):
 
 
 def get_yesterday_et():
-    """Return yesterday's date in ET as MM/DD/YYYY (format expected by NBA stats API)."""
+    """Return yesterday's date in ET as YYYY-MM-DD (format expected by ScoreboardV3)."""
     et = ZoneInfo("America/New_York")
     yesterday = datetime.now(et) - timedelta(days=1)
-    return yesterday.strftime("%m/%d/%Y")
+    return yesterday.strftime("%Y-%m-%d")
 
 
 def fetch_scoreboard(date_str):
-    """Return (games, team_info) from ScoreboardV2 for the given date."""
-    board = _retry(scoreboardv2.ScoreboardV2, game_date=date_str, timeout=_API_TIMEOUT)
+    """Return games list from ScoreboardV3 for the given date."""
+    board = _retry(scoreboardv3.ScoreboardV3, game_date=date_str, timeout=_API_TIMEOUT)
 
     game_header = board.game_header.get_dict()
     line_score = board.line_score.get_dict()
@@ -72,21 +72,32 @@ def fetch_scoreboard(date_str):
     # Build team lookup: (game_id, team_id) -> {abbr, pts}
     team_info = {}
     for row in line_score["data"]:
-        game_id = str(row[ls_idx["GAME_ID"]])
-        team_id = row[ls_idx["TEAM_ID"]]
+        game_id = str(row[ls_idx["gameId"]])
+        team_id = row[ls_idx["teamId"]]
         team_info[(game_id, team_id)] = {
-            "abbr": row[ls_idx["TEAM_ABBREVIATION"]],
-            "pts": row[ls_idx["PTS"]] or 0,
+            "abbr": row[ls_idx["teamTricode"]],
+            "pts": row[ls_idx["score"]] or 0,
         }
 
     games = []
     for row in game_header["data"]:
-        game_id = str(row[gh_idx["GAME_ID"]])
-        home_id = row[gh_idx["HOME_TEAM_ID"]]
-        away_id = row[gh_idx["VISITOR_TEAM_ID"]]
+        game_id = str(row[gh_idx["gameId"]])
+        # gameCode format: "YYYYMMDD/AWYHOM" – first 3 chars = away tricode,
+        # last 3 chars = home tricode.
+        game_code = row[gh_idx["gameCode"]] or ""
+        tricodes = game_code.split("/")[-1] if "/" in game_code else ""
+        away_tricode = tricodes[:3]
+        home_tricode = tricodes[3:]
 
-        home = team_info.get((game_id, home_id), {"abbr": "?", "pts": 0})
-        away = team_info.get((game_id, away_id), {"abbr": "?", "pts": 0})
+        # Find matching team rows by tricode
+        home = next(
+            (v for (gid, _), v in team_info.items() if gid == game_id and v["abbr"] == home_tricode),
+            {"abbr": home_tricode or "?", "pts": 0},
+        )
+        away = next(
+            (v for (gid, _), v in team_info.items() if gid == game_id and v["abbr"] == away_tricode),
+            {"abbr": away_tricode or "?", "pts": 0},
+        )
 
         games.append(
             {
