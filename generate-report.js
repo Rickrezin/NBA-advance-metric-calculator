@@ -50,7 +50,7 @@ function isDST(date) {
 
 // ─── LOAD NBA DATA ────────────────────────────────────────────────
 function loadNBAData() {
-  const dataPath = join(__dirname, "data", "nba_data.json");
+  const dataPath = join(process.cwd(), "data", "nba_data.json");
   const raw = readFileSync(dataPath, "utf-8");
   return JSON.parse(raw);
 }
