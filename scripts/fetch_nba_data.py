@@ -20,23 +20,48 @@ import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
+import requests.exceptions
+
 from nba_api.stats.endpoints import (
-    scoreboardv2,
+    scoreboardv3,
     boxscoretraditionalv2,
     boxscoreadvancedv2,
 )
 
+_API_TIMEOUT = 60
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 5  # seconds; doubles on each retry
+_RETRYABLE = (
+    requests.exceptions.Timeout,
+    requests.exceptions.ConnectionError,
+    requests.exceptions.ChunkedEncodingError,
+)
+
+
+def _retry(fn, *args, **kwargs):
+    """Call fn(*args, **kwargs), retrying on network errors up to _MAX_RETRIES times."""
+    delay = _RETRY_BACKOFF
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return fn(*args, **kwargs)
+        except _RETRYABLE as exc:
+            if attempt == _MAX_RETRIES:
+                raise
+            print(f"  Attempt {attempt} failed ({exc}). Retrying in {delay}s…")
+            time.sleep(delay)
+            delay *= 2
+
 
 def get_yesterday_et():
-    """Return yesterday's date in ET as MM/DD/YYYY (format expected by NBA stats API)."""
+    """Return yesterday's date in ET as YYYY-MM-DD (format expected by ScoreboardV3)."""
     et = ZoneInfo("America/New_York")
     yesterday = datetime.now(et) - timedelta(days=1)
-    return yesterday.strftime("%m/%d/%Y")
+    return yesterday.strftime("%Y-%m-%d")
 
 
 def fetch_scoreboard(date_str):
-    """Return (games, team_info) from ScoreboardV2 for the given date."""
-    board = scoreboardv2.ScoreboardV2(game_date=date_str, timeout=30)
+    """Return games list from ScoreboardV3 for the given date."""
+    board = _retry(scoreboardv3.ScoreboardV3, game_date=date_str, timeout=_API_TIMEOUT)
 
     game_header = board.game_header.get_dict()
     line_score = board.line_score.get_dict()
@@ -44,32 +69,40 @@ def fetch_scoreboard(date_str):
     gh_idx = {h: i for i, h in enumerate(game_header["headers"])}
     ls_idx = {h: i for i, h in enumerate(line_score["headers"])}
 
-    # Build team lookup: (game_id, team_id) -> {abbr, pts}
-    team_info = {}
+    # Build tricode_pts lookup: (game_id, tricode) -> pts for O(1) home/away lookup
+    tricode_pts: dict[tuple[str, str], int] = {}
     for row in line_score["data"]:
-        game_id = str(row[ls_idx["GAME_ID"]])
-        team_id = row[ls_idx["TEAM_ID"]]
-        team_info[(game_id, team_id)] = {
-            "abbr": row[ls_idx["TEAM_ABBREVIATION"]],
-            "pts": row[ls_idx["PTS"]] or 0,
-        }
+        game_id = str(row[ls_idx["gameId"]])
+        tricode = row[ls_idx["teamTricode"]]
+        pts = row[ls_idx["score"]] or 0
+        tricode_pts[(game_id, tricode)] = pts
 
     games = []
     for row in game_header["data"]:
-        game_id = str(row[gh_idx["GAME_ID"]])
-        home_id = row[gh_idx["HOME_TEAM_ID"]]
-        away_id = row[gh_idx["VISITOR_TEAM_ID"]]
+        game_id = str(row[gh_idx["gameId"]])
+        # gameCode format: "YYYYMMDD/AWYHOM"
+        # The suffix after "/" is always exactly 6 chars: 3-char away tricode
+        # followed by 3-char home tricode (NBA convention).
+        game_code = row[gh_idx["gameCode"]] or ""
+        suffix = game_code.split("/")[-1] if "/" in game_code else ""
+        if len(suffix) == 6:
+            away_tricode = suffix[:3]
+            home_tricode = suffix[3:]
+        else:
+            away_tricode = "?"
+            home_tricode = "?"
+            print(f"  Warning: unexpected gameCode format '{game_code}' for game {game_id}")
 
-        home = team_info.get((game_id, home_id), {"abbr": "?", "pts": 0})
-        away = team_info.get((game_id, away_id), {"abbr": "?", "pts": 0})
+        home_pts = tricode_pts.get((game_id, home_tricode), 0)
+        away_pts = tricode_pts.get((game_id, away_tricode), 0)
 
         games.append(
             {
                 "game_id": game_id,
-                "home_alias": home["abbr"],
-                "away_alias": away["abbr"],
-                "home_points": home["pts"],
-                "away_points": away["pts"],
+                "home_alias": home_tricode,
+                "away_alias": away_tricode,
+                "home_points": home_pts,
+                "away_points": away_pts,
             }
         )
 
@@ -80,9 +113,9 @@ def fetch_players_for_game(game):
     """Fetch and parse player rows for one game. Returns list of player dicts."""
     game_id = game["game_id"]
 
-    trad = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=30)
+    trad = _retry(boxscoretraditionalv2.BoxScoreTraditionalV2, game_id=game_id, timeout=_API_TIMEOUT)
     time.sleep(0.6)
-    adv = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=game_id, timeout=30)
+    adv = _retry(boxscoreadvancedv2.BoxScoreAdvancedV2, game_id=game_id, timeout=_API_TIMEOUT)
 
     trad_dict = trad.player_stats.get_dict()
     adv_dict = adv.player_stats.get_dict()
