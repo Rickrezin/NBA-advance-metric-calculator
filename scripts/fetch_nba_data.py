@@ -69,43 +69,40 @@ def fetch_scoreboard(date_str):
     gh_idx = {h: i for i, h in enumerate(game_header["headers"])}
     ls_idx = {h: i for i, h in enumerate(line_score["headers"])}
 
-    # Build team lookup: (game_id, team_id) -> {abbr, pts}
-    team_info = {}
+    # Build tricode_pts lookup: (game_id, tricode) -> pts for O(1) home/away lookup
+    tricode_pts: dict[tuple[str, str], int] = {}
     for row in line_score["data"]:
         game_id = str(row[ls_idx["gameId"]])
-        team_id = row[ls_idx["teamId"]]
-        team_info[(game_id, team_id)] = {
-            "abbr": row[ls_idx["teamTricode"]],
-            "pts": row[ls_idx["score"]] or 0,
-        }
+        tricode = row[ls_idx["teamTricode"]]
+        pts = row[ls_idx["score"]] or 0
+        tricode_pts[(game_id, tricode)] = pts
 
     games = []
     for row in game_header["data"]:
         game_id = str(row[gh_idx["gameId"]])
-        # gameCode format: "YYYYMMDD/AWYHOM" – first 3 chars = away tricode,
-        # last 3 chars = home tricode.
+        # gameCode format: "YYYYMMDD/AWYHOM"
+        # The suffix after "/" is always exactly 6 chars: 3-char away tricode
+        # followed by 3-char home tricode (NBA convention).
         game_code = row[gh_idx["gameCode"]] or ""
-        tricodes = game_code.split("/")[-1] if "/" in game_code else ""
-        away_tricode = tricodes[:3]
-        home_tricode = tricodes[3:]
+        suffix = game_code.split("/")[-1] if "/" in game_code else ""
+        if len(suffix) == 6:
+            away_tricode = suffix[:3]
+            home_tricode = suffix[3:]
+        else:
+            away_tricode = "?"
+            home_tricode = "?"
+            print(f"  Warning: unexpected gameCode format '{game_code}' for game {game_id}")
 
-        # Find matching team rows by tricode
-        home = next(
-            (v for (gid, _), v in team_info.items() if gid == game_id and v["abbr"] == home_tricode),
-            {"abbr": home_tricode or "?", "pts": 0},
-        )
-        away = next(
-            (v for (gid, _), v in team_info.items() if gid == game_id and v["abbr"] == away_tricode),
-            {"abbr": away_tricode or "?", "pts": 0},
-        )
+        home_pts = tricode_pts.get((game_id, home_tricode), 0)
+        away_pts = tricode_pts.get((game_id, away_tricode), 0)
 
         games.append(
             {
                 "game_id": game_id,
-                "home_alias": home["abbr"],
-                "away_alias": away["abbr"],
-                "home_points": home["pts"],
-                "away_points": away["pts"],
+                "home_alias": home_tricode,
+                "away_alias": away_tricode,
+                "home_points": home_pts,
+                "away_points": away_pts,
             }
         )
 
