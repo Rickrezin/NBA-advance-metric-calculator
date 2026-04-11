@@ -25,6 +25,40 @@ from nba_api.stats.endpoints import (
     boxscoretraditionalv2,
     boxscoreadvancedv2,
 )
+from nba_api.stats.library.http import NBAStatsHTTP
+
+# stats.nba.com requires browser-like headers or it stalls/blocks CI requests.
+NBAStatsHTTP.HEADERS = {
+    "Host": "stats.nba.com",
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/123.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Accept-Encoding": "gzip, deflate, br",
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token": "true",
+    "Referer": "https://www.nba.com/",
+    "Origin": "https://www.nba.com",
+    "Connection": "keep-alive",
+}
+
+MAX_RETRIES = 3
+RETRY_DELAY = 5  # seconds
+
+
+def retry(fn, *args, retries=MAX_RETRIES, delay=RETRY_DELAY, **kwargs):
+    """Call fn(*args, **kwargs), retrying up to `retries` times on exception."""
+    for attempt in range(1, retries + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as e:
+            print(f"  Attempt {attempt}/{retries} failed: {e}")
+            if attempt < retries:
+                time.sleep(delay)
+    raise RuntimeError(f"All {retries} retries exhausted for {fn.__name__}")
 
 
 def get_yesterday_et():
@@ -36,7 +70,7 @@ def get_yesterday_et():
 
 def fetch_scoreboard(date_str):
     """Return (games, team_info) from ScoreboardV2 for the given date."""
-    board = scoreboardv2.ScoreboardV2(game_date=date_str, timeout=30)
+    board = retry(scoreboardv2.ScoreboardV2, game_date=date_str, timeout=60)
 
     game_header = board.game_header.get_dict()
     line_score = board.line_score.get_dict()
@@ -80,9 +114,9 @@ def fetch_players_for_game(game):
     """Fetch and parse player rows for one game. Returns list of player dicts."""
     game_id = game["game_id"]
 
-    trad = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=30)
-    time.sleep(0.6)
-    adv = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=game_id, timeout=30)
+    trad = retry(boxscoretraditionalv2.BoxScoreTraditionalV2, game_id=game_id, timeout=60)
+    time.sleep(1)
+    adv = retry(boxscoreadvancedv2.BoxScoreAdvancedV2, game_id=game_id, timeout=60)
 
     trad_dict = trad.player_stats.get_dict()
     adv_dict = adv.player_stats.get_dict()
