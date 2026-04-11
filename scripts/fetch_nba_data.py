@@ -21,7 +21,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from nba_api.stats.endpoints import (
-    scoreboardv2,
+    scoreboardv3,
     boxscoretraditionalv2,
     boxscoreadvancedv2,
 )
@@ -35,41 +35,23 @@ def get_yesterday_et():
 
 
 def fetch_scoreboard(date_str):
-    """Return (games, team_info) from ScoreboardV2 for the given date."""
-    board = scoreboardv2.ScoreboardV2(game_date=date_str, timeout=30)
+    """Return games list from ScoreboardV3 for the given date."""
+    board = scoreboardv3.ScoreboardV3(game_date=date_str, league_id="00", timeout=30)
 
-    game_header = board.game_header.get_dict()
-    line_score = board.line_score.get_dict()
-
-    gh_idx = {h: i for i, h in enumerate(game_header["headers"])}
-    ls_idx = {h: i for i, h in enumerate(line_score["headers"])}
-
-    # Build team lookup: (game_id, team_id) -> {abbr, pts}
-    team_info = {}
-    for row in line_score["data"]:
-        game_id = str(row[ls_idx["GAME_ID"]])
-        team_id = row[ls_idx["TEAM_ID"]]
-        team_info[(game_id, team_id)] = {
-            "abbr": row[ls_idx["TEAM_ABBREVIATION"]],
-            "pts": row[ls_idx["PTS"]] or 0,
-        }
+    # ScoreboardV3 returns a nested dict, not headers/rows
+    sb = board.score_board.get_dict()
 
     games = []
-    for row in game_header["data"]:
-        game_id = str(row[gh_idx["GAME_ID"]])
-        home_id = row[gh_idx["HOME_TEAM_ID"]]
-        away_id = row[gh_idx["VISITOR_TEAM_ID"]]
-
-        home = team_info.get((game_id, home_id), {"abbr": "?", "pts": 0})
-        away = team_info.get((game_id, away_id), {"abbr": "?", "pts": 0})
-
+    for g in sb.get("games", []):
+        home = g["homeTeam"]
+        away = g["awayTeam"]
         games.append(
             {
-                "game_id": game_id,
-                "home_alias": home["abbr"],
-                "away_alias": away["abbr"],
-                "home_points": home["pts"],
-                "away_points": away["pts"],
+                "game_id": g["gameId"],
+                "home_alias": home["teamTricode"],
+                "away_alias": away["teamTricode"],
+                "home_points": home.get("score") or 0,
+                "away_points": away.get("score") or 0,
             }
         )
 
