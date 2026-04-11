@@ -26,6 +26,24 @@ from nba_api.stats.endpoints import (
     boxscoreadvancedv2,
 )
 
+_API_TIMEOUT = 60
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 5  # seconds; doubles on each retry
+
+
+def _retry(fn, *args, **kwargs):
+    """Call fn(*args, **kwargs), retrying up to _MAX_RETRIES times on failure."""
+    delay = _RETRY_BACKOFF
+    for attempt in range(1, _MAX_RETRIES + 1):
+        try:
+            return fn(*args, **kwargs)
+        except Exception as exc:
+            if attempt == _MAX_RETRIES:
+                raise
+            print(f"  Attempt {attempt} failed ({exc}). Retrying in {delay}s…")
+            time.sleep(delay)
+            delay *= 2
+
 
 def get_yesterday_et():
     """Return yesterday's date in ET as MM/DD/YYYY (format expected by NBA stats API)."""
@@ -36,7 +54,7 @@ def get_yesterday_et():
 
 def fetch_scoreboard(date_str):
     """Return (games, team_info) from ScoreboardV2 for the given date."""
-    board = scoreboardv2.ScoreboardV2(game_date=date_str, timeout=30)
+    board = _retry(scoreboardv2.ScoreboardV2, game_date=date_str, timeout=_API_TIMEOUT)
 
     game_header = board.game_header.get_dict()
     line_score = board.line_score.get_dict()
@@ -80,9 +98,9 @@ def fetch_players_for_game(game):
     """Fetch and parse player rows for one game. Returns list of player dicts."""
     game_id = game["game_id"]
 
-    trad = boxscoretraditionalv2.BoxScoreTraditionalV2(game_id=game_id, timeout=30)
+    trad = _retry(boxscoretraditionalv2.BoxScoreTraditionalV2, game_id=game_id, timeout=_API_TIMEOUT)
     time.sleep(0.6)
-    adv = boxscoreadvancedv2.BoxScoreAdvancedV2(game_id=game_id, timeout=30)
+    adv = _retry(boxscoreadvancedv2.BoxScoreAdvancedV2, game_id=game_id, timeout=_API_TIMEOUT)
 
     trad_dict = trad.player_stats.get_dict()
     adv_dict = adv.player_stats.get_dict()
