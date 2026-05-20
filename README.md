@@ -63,6 +63,15 @@ The workflow fires automatically every day at **8:00 AM Eastern** (13:00 UTC). N
 | `REPORT_EMAIL_TO` | Email to receive the report (e.g. you@gmail.com) |
 | `REPORT_EMAIL_FROM` | Verified SendGrid sender email |
 
+### Editing existing secrets
+If you need to update a secret (e.g. after rotating an API key):
+1. In your GitHub repo, go to **Settings → Secrets and variables → Actions**
+2. Under **Repository secrets**, find the secret you want to change
+3. Click the **✏️ pencil icon** next to it
+4. Enter the new value in the **Value** field and click **Update secret**
+
+> **Note:** GitHub never displays the current value of a secret — you can only overwrite it with a new one.
+
 ### Step 4 — Enable GitHub Pages
 1. In your repo, go to **Settings → Pages**
 2. Under **Source**, select **GitHub Actions**
